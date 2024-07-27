@@ -34,8 +34,17 @@ def main():
             for file in files:
                 pdf_text = get_text(file)
                 doc_text[file.name] = pdf_text
+
+            # Get sentences on each page
+            doc_text_sentences = get_doc_sentences(doc_text)
+
+            # Chunk Sentences together (fixed size chunking)
+
+
+
             st.write("Files Processed Successfully...!")
 
 
 if __name__ == "__main__":
     main()
+    print()
