@@ -1,4 +1,5 @@
 import streamlit as st
+import time
 
 from utils.prompts import PROMPT
 from utils.helper import *
@@ -30,6 +31,7 @@ def main():
     files = st.file_uploader("", type='pdf', accept_multiple_files=True)
     if st.button("Confirm") and files:
         with st.spinner("Processing..."):
+            start = time.time()
             doc_text = {}
             for file in files:
                 pdf_text = get_text(file)
@@ -40,12 +42,9 @@ def main():
                 for text_dict in pagetext_list:
                     text_dict['sentences'] = get_sentences(text_dict['text'])
                     text_dict['chunked_sentences'] = chunk_sentences(text_dict['sentences'])
-                    text_dict['']
 
-
-
-
-            st.write("Files Processed Successfully...!")
+            runtime = time.time() - start
+            st.write(f"Files Processed Successfully...! {runtime}")
 
 
 if __name__ == "__main__":

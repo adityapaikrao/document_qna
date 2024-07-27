@@ -1,9 +1,10 @@
-from typing import List, Dict, Union
+from typing import List, Dict, Union, Any
 
-import spacy
-
-import fitz
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 from spacy.lang.en import English
+import fitz
 
 
 def format_text(text: str) -> str:
@@ -13,11 +14,10 @@ def format_text(text: str) -> str:
     :return:
     """
     clean = text.replace("\n", " ").strip()
-    print(clean)
     return clean
 
 
-def get_text(file: object) -> dict:
+def get_text(file: object) -> List[dict[str, Union[str, object]]]:
     file.seek(0)
     doc = fitz.open(stream=file.read(), filetype='pdf')
     page_text = []
@@ -80,7 +80,32 @@ def combine_sentences(sentences: list[str], buffer_size: int) -> list[dict[str, 
     return sentences
 
 
-def chunk_sentences(doc_text_sentences: List[str], buffer_size: int = 1) -> None:
+def calculate_cosine_distances(sentences: List[dict[str, Union[str, int]]]) -> str:
+    distances = []
+    for i in range(len(sentences) - 1):
+        embedding_current = sentences[i]['combined_sentence_embedding']
+        embedding_next = sentences[i + 1]['combined_sentence_embedding']
+
+        # Calculate cosine similarity
+        similarity = cosine_similarity([embedding_current], [embedding_next])[0][0]
+
+        # Convert to cosine distance
+        distance = 1 - similarity
+
+        # Append cosine distance to the list
+        distances.append(distance)
+
+        # Store distance in the dictionary
+        sentences[i]['distance_to_next'] = distance
+
+    # Optionally handle the last sentence
+    sentences[-1]['distance_to_next'] = 1  # or a default value
+
+    return distances, sentences
+
+
+def chunk_sentences(doc_text_sentences: List[str], buffer_size: int = 1,
+                    breakpoint_percentile_threshold: int = 80) -> None:
     """
 
     :param doc_text_sentences:
@@ -88,4 +113,33 @@ def chunk_sentences(doc_text_sentences: List[str], buffer_size: int = 1) -> None
     :return:
     """
     combined_sentences = combine_sentences(doc_text_sentences, buffer_size)
-    print()
+
+    # Embed sentences
+    model = SentenceTransformer('Snowflake/snowflake-arctic-embed-s')
+    embeddings = model.encode(sentences=[x['combined_sentence'] for x in combined_sentences])
+
+    for i, sentence in enumerate(combined_sentences):
+        sentence['combined_sentence_embedding'] = embeddings[i]
+    # Calculate semantic distances
+    distances, sentences = calculate_cosine_distances(combined_sentences)
+
+    # find breakpoint
+    breakpoint_distance_threshold = np.percentile(distances, breakpoint_percentile_threshold)
+    indices_above_thresh = [i for i, x in enumerate(distances) if x > breakpoint_distance_threshold]
+
+    # Create chunks
+    start_index = 0
+    chunks = []
+    for index in indices_above_thresh:
+        end_index = index
+        group = sentences[start_index:end_index + 1]
+        combined_text = ' '.join([str(d['sentence']) for d in group])
+        chunks.append(combined_text)
+        start_index = index + 1
+
+    # Handle the last group, if any sentences remain
+    if start_index < len(sentences):
+        combined_text = ' '.join([str(d['sentence']) for d in sentences[start_index:]])
+        chunks.append(combined_text)
+
+    return chunks

@@ -1,3 +1,5 @@
 streamlit
 pyMUpdf
 spacy
+sentence-transformers
+scikit-learn
