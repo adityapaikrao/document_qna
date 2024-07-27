@@ -35,10 +35,13 @@ def main():
                 pdf_text = get_text(file)
                 doc_text[file.name] = pdf_text
 
-            # Get sentences on each page
-            doc_text_sentences = get_doc_sentences(doc_text)
+            # Process text & chunk together
+            for docname, pagetext_list in doc_text.items():
+                for text_dict in pagetext_list:
+                    text_dict['sentences'] = get_sentences(text_dict['text'])
+                    text_dict['chunked_sentences'] = chunk_sentences(text_dict['sentences'])
+                    text_dict['']
 
-            # Chunk Sentences together (fixed size chunking)
 
 
 
