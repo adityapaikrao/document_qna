@@ -1,10 +1,12 @@
-from typing import List, Dict, Union, Any
-
+from typing import List, Dict, Union, Any, Tuple, Optional
+import chromadb
+from numpy import ndarray
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from spacy.lang.en import English
 import fitz
+from torch import Tensor
 
 
 def format_text(text: str) -> str:
@@ -17,7 +19,7 @@ def format_text(text: str) -> str:
     return clean
 
 
-def get_text(file: object) -> List[dict[str, Union[str, object]]]:
+def get_text(file: object) -> list[dict[str, Union[str, Any]]]:
     file.seek(0)
     doc = fitz.open(stream=file.read(), filetype='pdf')
     page_text = []
@@ -27,7 +29,8 @@ def get_text(file: object) -> List[dict[str, Union[str, object]]]:
         # text = text.split("\n\n") # get paragraphs
         pagewise_text = {"doc": file.name,
                          "page_num": pg.number,
-                         "text": text
+                         "text": text,
+                         "num_of_pages": doc.page_count
                          }
         page_text.append(pagewise_text)
     return page_text
@@ -105,7 +108,7 @@ def calculate_cosine_distances(sentences: List[dict[str, Union[str, int]]]) -> s
 
 
 def chunk_sentences(doc_text_sentences: List[str], buffer_size: int = 1,
-                    breakpoint_percentile_threshold: int = 80) -> None:
+                    breakpoint_percentile_threshold: int = 80) -> list[str]:
     """
 
     :param doc_text_sentences:
@@ -115,7 +118,7 @@ def chunk_sentences(doc_text_sentences: List[str], buffer_size: int = 1,
     combined_sentences = combine_sentences(doc_text_sentences, buffer_size)
 
     # Embed sentences
-    model = SentenceTransformer('Snowflake/snowflake-arctic-embed-s')
+    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
     embeddings = model.encode(sentences=[x['combined_sentence'] for x in combined_sentences])
 
     for i, sentence in enumerate(combined_sentences):
@@ -143,3 +146,48 @@ def chunk_sentences(doc_text_sentences: List[str], buffer_size: int = 1,
         chunks.append(combined_text)
 
     return chunks
+
+
+def get_chunked_embeddings(chunked_list: List[str]) -> Union[object, list]:
+    """
+
+    :param chunked_list:
+    :return:
+    """
+    model = SentenceTransformer('Snowflake/snowflake-arctic-embed-s')
+    embeddings = model.encode(sentences=[x for x in chunked_list])
+
+    # chunked_dict = {}
+    # for i in range(len(chunked_list)):
+    #     chunked_dict[chunked_list[i]] = embeddings[i]
+
+    return embeddings.tolist()
+
+
+def store_to_db(doc_text, reset_db):
+    """
+
+    :param doc_text:
+    :param reset_db:
+    :return:
+    """
+    client = chromadb.PersistentClient(path='./db/doc/vector_store')
+    if reset_db == 'Yes':
+        try:
+            client.delete_collection('vector_store')
+            print('Deleted')
+        except:
+            print('Could Not Delete collection..')
+    collection = client.get_or_create_collection(name='vector_store')
+
+    for docname, pagewise_data in doc_text.items():
+        for page_data in pagewise_data:
+            for i, embeddings in enumerate(page_data['chunked_embeddings']):
+                page_num = page_data['page_num']
+                collection.add(documents=page_data['chunked_sentences'][i],
+                               metadatas=[{'docname': docname,'page_num': page_num}],
+                               ids=[f'{docname}-{page_num}-{i}'],
+                               embeddings=[embeddings]
+                               )
+    print('Vectorized DB succesfully..')
+

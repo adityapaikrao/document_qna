@@ -3,3 +3,4 @@ pyMUpdf
 spacy
 sentence-transformers
 scikit-learn
+chromadb
