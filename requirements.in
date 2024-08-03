@@ -4,3 +4,4 @@ spacy
 sentence-transformers
 scikit-learn
 chromadb
+ollama

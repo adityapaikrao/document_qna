@@ -1,12 +1,10 @@
-from typing import List, Dict, Union, Any, Tuple, Optional
-import chromadb
-from numpy import ndarray
+from typing import List, Union, Any
+import time
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 from spacy.lang.en import English
 import fitz
-from torch import Tensor
 
 
 def format_text(text: str) -> str:
@@ -111,6 +109,7 @@ def chunk_sentences(doc_text_sentences: List[str], buffer_size: int = 1,
                     breakpoint_percentile_threshold: int = 80) -> list[str]:
     """
 
+    :param breakpoint_percentile_threshold:
     :param doc_text_sentences:
     :param buffer_size:
     :return:
@@ -148,11 +147,12 @@ def chunk_sentences(doc_text_sentences: List[str], buffer_size: int = 1,
     return chunks
 
 
-def get_chunked_embeddings(chunked_list: List[str]) -> Union[object, list]:
+def get_embeddings(chunked_list: List[str]) -> Union[object, list]:
     """
 
     :param chunked_list:
     :return:
+
     """
     model = SentenceTransformer('Snowflake/snowflake-arctic-embed-s')
     embeddings = model.encode(sentences=[x for x in chunked_list])
@@ -162,32 +162,4 @@ def get_chunked_embeddings(chunked_list: List[str]) -> Union[object, list]:
     #     chunked_dict[chunked_list[i]] = embeddings[i]
 
     return embeddings.tolist()
-
-
-def store_to_db(doc_text, reset_db):
-    """
-
-    :param doc_text:
-    :param reset_db:
-    :return:
-    """
-    client = chromadb.PersistentClient(path='./db/doc/vector_store')
-    if reset_db == 'Yes':
-        try:
-            client.delete_collection('vector_store')
-            print('Deleted')
-        except:
-            print('Could Not Delete collection..')
-    collection = client.get_or_create_collection(name='vector_store')
-
-    for docname, pagewise_data in doc_text.items():
-        for page_data in pagewise_data:
-            for i, embeddings in enumerate(page_data['chunked_embeddings']):
-                page_num = page_data['page_num']
-                collection.add(documents=page_data['chunked_sentences'][i],
-                               metadatas=[{'docname': docname,'page_num': page_num}],
-                               ids=[f'{docname}-{page_num}-{i}'],
-                               embeddings=[embeddings]
-                               )
-    print('Vectorized DB succesfully..')
 

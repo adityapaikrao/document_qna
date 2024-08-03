@@ -1,11 +1,12 @@
 import streamlit as st
-import time
 
-from utils.prompts import PROMPT
-from utils.helper import *
+from utils.chunker import get_text, get_sentences, chunk_sentences, get_embeddings
+from utils.chroma import store_to_db, get_context_from_db
+from utils.llm_chat import get_llm_response, response_generator
 
 
 def main():
+    global chat_history
     st.set_page_config(layout="wide", page_title="Chat with PDF", page_icon=":robot_face:")
     ss = st.session_state
 
@@ -29,8 +30,6 @@ def main():
             models = ["test", "test2"]
             st.selectbox("model", options=models, key="model")
 
-            # prompts
-            st.text_area("prompt", value=PROMPT["p1"], key='prompt')
             reset_db = st.radio('Reset DB?', options=['No', 'Yes'], index=0)
 
         if button_confirm and files:
@@ -58,7 +57,7 @@ def main():
                     print('CHUNKING SOURCE PDF....')
                     text_dict['chunked_sentences'] = chunk_sentences(text_dict['sentences'])
                     print('EMBEDDING CHUNKED SENTENCES....\n')
-                    text_dict['chunked_embeddings'] = get_chunked_embeddings(text_dict['chunked_sentences'])
+                    text_dict['chunked_embeddings'] = get_embeddings(text_dict['chunked_sentences'])
                 progress_bar.progress(100, 'Processed Successfully!')
 
             print('STORING TO YOUR DB...')
@@ -66,9 +65,35 @@ def main():
             # insert to DB
             store_to_db(doc_text, reset_db)
 
-
     # Main Window
     st.write('Ask a question!')
+
+    if 'messages' not in ss:
+        ss['messages'] = []
+
+    for message in ss['messages']:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Chat Interface
+    if query := st.chat_input("Got questions?"):
+        # Add user message to chat history
+        ss['messages'].append({"role": "user", "content": query})
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(query)
+
+        # get relevant context
+        context = get_context_from_db(query)
+        response_text = get_llm_response(query, ss['messages'], context=context)
+
+        # Display assistant response in chat message container
+        with st.chat_message("assistant"):
+            # st.markdown(response)
+            response = st.write_stream(response_generator(response_text))
+        # Add assistant response to chat history
+        ss['messages'].append({"role": "assistant", "content": response})
+    print()
 
 
 if __name__ == "__main__":
