@@ -27,8 +27,8 @@ def main():
 
         with expander_config:
             # models
-            models = ["test", "test2"]
-            st.selectbox("model", options=models, key="model")
+            # models = ["test", "test2"]
+            # st.selectbox("model", options=models, key="model")
 
             reset_db = st.radio('Reset DB?', options=['No', 'Yes'], index=0)
 

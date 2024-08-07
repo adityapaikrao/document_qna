@@ -1,2 +1,2 @@
 # document_qna
-streamlit app for document Q&amp;A deployed using GCP
+A streamlit app using local LLMs.
