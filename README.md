@@ -29,8 +29,8 @@ A Streamlit-based web application that allows users to upload PDF documents and 
     ```
 
 3. Run the App!
-  ```
-  streamlit run.py
-  ```
+     ```
+     streamlit run.py
+     ```
 
 
